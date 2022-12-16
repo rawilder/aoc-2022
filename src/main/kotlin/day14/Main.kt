@@ -2,6 +2,8 @@ package day14
 
 import util.Util
 import util.Util.shouldBe
+import java.awt.Frame
+import kotlin.system.exitProcess
 
 typealias Coordinate = Pair<Int, Int>
 
@@ -10,20 +12,36 @@ fun main() {
     val testMapState = rocks.associateWith {
         MAP_STATE.ROCK
     }
-    howMuchSandAtRestWhenFallingToAbyss(testMapState, Coordinate(500, 0)) shouldBe 24
+//    howMuchSandAtRestWhenFallingToAbyss(testMapState, Coordinate(500, 0)) shouldBe 24
+//    howMuchSandAtRestWhenSourceIsAtRest(testMapState, Coordinate(500, 0)) shouldBe 93
+
+//    exitProcess(1)
+
     val mapState = parseRockMapFromFile("/day14/input.txt")
         .associateWith {
             MAP_STATE.ROCK
         }
-    println("star 1: ${howMuchSandAtRestWhenFallingToAbyss(mapState, Coordinate(500, 0))}")
-    println("star 2: ${howMuchSandAtRestWhenSourceIsAtRest(mapState, Coordinate(500, 0))}")
+//    println("star 1: ${howMuchSandAtRestWhenFallingToAbyss(mapState, Coordinate(500, 0))}")
+    println("star 2: ${howMuchSandAtRestWhenSourceIsAtRest(mapState, Coordinate(500, 0),
+        shouldDraw = true,
+        shouldDrawEndState = false
+    )}")
 }
 
-fun howMuchSandAtRestWhenSourceIsAtRest(mapState: Map<Coordinate, MAP_STATE>, sandSourceCoordinate: Coordinate): Int {
+fun howMuchSandAtRestWhenSourceIsAtRest(mapState: Map<Coordinate, MAP_STATE>, sandSourceCoordinate: Coordinate, shouldDraw: Boolean = false, shouldDrawEndState: Boolean = false): Int {
     val mutableMapState = mapState.toMutableMap().withDefault { MAP_STATE.EMPTY }
     val floorY = mutableMapState.keys.maxOf { it.second } + 2
+
+    val drawXLeft by lazy { mutableMapState.keys.minOf { it.first } - 10 }
+    val drawXRight by lazy { mutableMapState.keys.maxOf { it.first } + 10 }
+
     val sand = mutableListOf<Coordinate>()
     var isSourceAtRest = false
+    val frame = if (shouldDraw) {
+        drawScanInJavaSwingWindow(mutableMapState, floorY).also {
+            Thread.sleep(5000)
+        }
+    } else null
     while(!isSourceAtRest) {
         sand.add(sandSourceCoordinate)
         val toRemove = mutableListOf<Int>()
@@ -54,11 +72,62 @@ fun howMuchSandAtRestWhenSourceIsAtRest(mapState: Map<Coordinate, MAP_STATE>, sa
             sand.removeAt(it - indexesRemoved)
             indexesRemoved++
         }
+        if (shouldDraw) {
+            frame?.validate()
+            frame?.repaint()
+            Thread.sleep(10)
+        }
         if (sand.isEmpty()) {
             isSourceAtRest = true
         }
     }
+    if (shouldDrawEndState) {
+        println(scanAsString(mutableMapState, floorY))
+        drawScanInJavaSwingWindow(mutableMapState, floorY)
+    }
     return mutableMapState.values.count { it == MAP_STATE.SAND_AT_REST }
+}
+
+fun drawScanInJavaSwingWindow(scan: MutableMap<Coordinate, MAP_STATE>, floorY: Int): Frame {
+    val frame = javax.swing.JFrame()
+    frame.defaultCloseOperation = javax.swing.WindowConstants.EXIT_ON_CLOSE
+    frame.setSize(1920, 1080)
+    frame.isVisible = true
+    frame.contentPane.add(object : javax.swing.JComponent() {
+        override fun paintComponent(g: java.awt.Graphics) {
+            super.paintComponent(g)
+            g.font = java.awt.Font("Monospaced", java.awt.Font.PLAIN, 5)
+            g.color = java.awt.Color.BLACK
+            scanAsString(scan, floorY).lines().withIndex().forEach { (index, string) ->
+                g.drawString(string, 0, (index + 1) * 5)
+            }
+        }
+    })
+    return frame
+}
+
+fun scanAsString(mutableMapState: MutableMap<Coordinate, MAP_STATE>, floorY: Int): String {
+    val drawXLeft = 327
+    val drawXRight = 673
+    val drawYTop = -10
+    val drawYBottom = 173
+    val drawXRange = drawXLeft..drawXRight
+    val drawYRange = drawYTop..drawYBottom
+    val stringBuilder = StringBuilder()
+    drawYRange.forEach { y ->
+        drawXRange.forEach { x ->
+            val coordinate = Pair(x, y)
+            stringBuilder.append(when (mutableMapState.getValueOrScanDefault(coordinate, floorY)) {
+                MAP_STATE.EMPTY -> "."
+                MAP_STATE.ROCK -> "#"
+                MAP_STATE.SAND_MOVING -> "~"
+                MAP_STATE.SAND_AT_REST -> "o"
+                null -> "?"
+            })
+        }
+        stringBuilder.append("\n")
+    }
+    return stringBuilder.toString()
 }
 
 fun MutableMap<Coordinate, MAP_STATE>.getValueOrScanDefault(coordinate: Coordinate, floorY: Int): MAP_STATE {
