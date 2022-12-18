@@ -1,11 +1,12 @@
 package day16
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import util.Util
 import util.Util.shouldBe
-import kotlin.math.max
 import kotlin.system.measureTimeMillis
 
-fun main() {
+suspend fun main() {
     val testGraph = parseFileToGraph("/day16/test_input.txt")
     star1(testGraph, "AA", 30) shouldBe 1651
     measureTimeMillis {
@@ -37,7 +38,7 @@ data class Graph(val valves: Map<String, Valve>, val tunnels: Map<String, Set<St
     data class Valve(val valveName: String, val flowRate: Int)
 }
 
-tailrec fun star1(
+fun star1(
     graph: Graph,
     currentValve: String,
     minutes: Int,
@@ -56,59 +57,17 @@ tailrec fun star1(
         }
 }
 
-tailrec fun star2(
+fun star2(
     graph: Graph,
-    myCurrentValve: String?,
-    elephantCurrentValve: String?,
-    myMinutes: Int,
+    currentValve: String,
+    elephantValve: String,
+    minutes: Int,
     elephantMinutes: Int,
     pressureReleased: Int = 0,
     unopened: Set<String> = graph.valves.filterValues { valve -> valve.flowRate > 0 }.keys,
     allDistances: Map<String, Map<String, Int>> = graph.valves.keys.associateWith { dijkstras(graph, it) }
 ): Int {
-
-    val myValidUnopened = unopened.filter { (allDistances[myCurrentValve]?.get(it) ?: Int.MAX_VALUE) + 1 <= myMinutes }
-    val elephantValidUnopened = unopened.filter { (allDistances[elephantCurrentValve]?.get(it) ?: Int.MAX_VALUE) + 1 <= elephantMinutes }
-    val allPossibleValveCombinations: List<Pair<String?, String?>> = if (myValidUnopened.isEmpty()) {
-        elephantValidUnopened.map { null to it }
-    } else if (elephantValidUnopened.isEmpty()) {
-        myValidUnopened.map { it to null }
-    } else {
-        myValidUnopened.flatMap { myValve -> elephantValidUnopened.map { myValve to it } }.filter { it.first != it.second }
-    }
-    return if ((myValidUnopened.isEmpty() || myMinutes <= 0) && (elephantValidUnopened.isEmpty() || elephantMinutes <= 0) || allPossibleValveCombinations.isEmpty())
-        pressureReleased
-    else {
-        allPossibleValveCombinations.fold(-1) { acc, (maybeMyValve, maybeElephantsValve) ->
-            // prune if we can't beat the current best
-            val bestCasePressureRelease = unopened.sortedByDescending { graph.valves[it]!!.flowRate }.fold(Pair(0, max(myMinutes, elephantMinutes))) { (acc, minutes), unopenedValve ->
-                graph.valves[unopenedValve]!!.flowRate * minutes + acc to minutes - 1
-            }.first
-            if (acc >= pressureReleased + bestCasePressureRelease) {
-                acc
-            } else {
-                val myMinutesTakenToMoveAndOpen = myCurrentValve?.let { myCurrentValve -> allDistances[myCurrentValve]?.get(maybeMyValve)?.plus(1) ?: 0 } ?: 0
-                val elephantMinutesTakenToMoveAndOpen = elephantCurrentValve?.let { elephantCurrentValve -> allDistances[elephantCurrentValve]?.get(maybeElephantsValve)?.plus(1) ?: 0 } ?: 0
-                val myMinutesLeft = myMinutes - myMinutesTakenToMoveAndOpen
-                val elephantMinutesLeft = elephantMinutes - elephantMinutesTakenToMoveAndOpen
-                val myPressure = maybeMyValve?.let { graph.valves[it]!!.flowRate * myMinutesLeft } ?: 0
-                val elephantPressure = maybeElephantsValve?.let { graph.valves[it]!!.flowRate * elephantMinutesLeft } ?: 0
-                max(
-                    acc,
-                    star2(
-                        graph,
-                        maybeMyValve,
-                        maybeElephantsValve,
-                        myMinutesLeft,
-                        elephantMinutesLeft,
-                        pressureReleased + myPressure + elephantPressure,
-                        unopened - setOfNotNull(maybeMyValve, maybeElephantsValve),
-                        allDistances
-                    )
-                )
-            }
-        }
-    }
+    return 0
 }
 
 tailrec fun dijkstras(
